@@ -1,28 +1,30 @@
+# ============================================================
 # Made with love by Sulav
 # Free Fire Banner API
 # Sulav Info API Integration
-# OB54 Prime Level System - Prime 0 to 8
+# OB54 Prime Level System
 #
-# Endpoint:
-# /sulav?uid={}&name={}&guild={}&banner={}&avatar={}&prime={}
+# Prime support: 0 -> 8
 #
-# All query parameters are OPTIONAL.
+# Main endpoint:
+# /sulav
 #
-# Prime assets:
-# prime0.png
-# prime1.png
-# prime2.png
-# prime3.png
-# prime4.png
-# prime5.png
-# prime6.png
-# prime7.png
-# prime8.png
-# prime8frame.png
+# All parameters are OPTIONAL:
 #
-# Fonts:
-# arial_unicode_bold.otf
-# NotoSansCherokee.ttf
+# /sulav?uid={uid}
+# /sulav?uid={uid}&name={name}
+# /sulav?uid={uid}&name={name}&guild={guild}
+# /sulav?uid={uid}&banner={banner}&avatar={avatar}
+# /sulav?uid={uid}&prime={prime}
+# /sulav?uid={uid}&name={name}&guild={guild}&banner={banner}&avatar={avatar}&prime={prime}
+#
+# Prime 8:
+# prime8.png       -> badge
+# prime8frame.png  -> full banner gold/yellow frame
+#
+# Pin / question-mark image:
+# COMPLETELY REMOVED
+# ============================================================
 
 
 import io
@@ -30,8 +32,8 @@ import os
 import asyncio
 
 from contextlib import asynccontextmanager
-from typing import Optional, Dict, Any
 from concurrent.futures import ThreadPoolExecutor
+from typing import Optional, Dict, Any
 from urllib.parse import urlparse
 
 import httpx
@@ -57,8 +59,9 @@ from PIL import (
 # ADJUSTMENT SETTINGS
 # ============================================================
 
-AVATAR_ZOOM = 1.26
+TARGET_HEIGHT = 400
 
+AVATAR_ZOOM = 1.26
 AVATAR_SHIFT_X = 0
 AVATAR_SHIFT_Y = 0
 
@@ -77,57 +80,53 @@ STROKE_NAME = 3
 STROKE_GUILD = 2
 STROKE_LEVEL = 3
 
-TARGET_HEIGHT = 400
-
 PRIME_BADGE_SIZE = 120
 
 
 # ============================================================
-# CONFIGURATION
+# PRIME 0-8
+# ============================================================
+
+PRIME_FILES = {
+    0: "prime0.png",
+    1: "prime1.png",
+    2: "prime2.png",
+    3: "prime3.png",
+    4: "prime4.png",
+    5: "prime5.png",
+    6: "prime6.png",
+    7: "prime7.png",
+    8: "prime8.png",
+}
+
+
+# ============================================================
+# API CONFIG
 # ============================================================
 
 SULAV_INFO_API = (
     "https://info.sulavcodex.com/Sulav"
 )
 
+
+# Original Base64:
+# aHR0cHM6Ly9jZG4uanNkZWxpdnIubmV0L2doL1NoYWhHQ3JlYXRvci9pY29uQG1haW4vUE5H
+#
+# Decoded:
+# https://cdn.jsdelivr.net/gh/ShahGCreator/icon@main/PNG
+
 CDN_URL = (
     "https://cdn.jsdelivr.net/gh/"
     "ShahGCreator/icon@main/PNG"
 )
 
-FONT_FILE = (
-    "arial_unicode_bold.otf"
-)
-
-FONT_CHEROKEE = (
-    "NotoSansCherokee.ttf"
-)
-
 
 # ============================================================
-# PRIME 0-8 ASSETS
+# FONT FILES
 # ============================================================
 
-PRIME_FILES = {
-
-    0: "prime0.png",
-
-    1: "prime1.png",
-
-    2: "prime2.png",
-
-    3: "prime3.png",
-
-    4: "prime4.png",
-
-    5: "prime5.png",
-
-    6: "prime6.png",
-
-    7: "prime7.png",
-
-    8: "prime8.png",
-}
+FONT_FILE = "arial_unicode_bold.otf"
+FONT_CHEROKEE = "NotoSansCherokee.ttf"
 
 
 # ============================================================
@@ -156,7 +155,7 @@ sulav_client = httpx.AsyncClient(
 
 
 # ============================================================
-# IMAGE PROCESSING POOL
+# IMAGE PROCESSING THREAD POOL
 # ============================================================
 
 sulav_process_pool = ThreadPoolExecutor(
@@ -165,7 +164,7 @@ sulav_process_pool = ThreadPoolExecutor(
 
 
 # ============================================================
-# APP LIFESPAN
+# FASTAPI LIFESPAN
 # ============================================================
 
 @asynccontextmanager
@@ -181,7 +180,7 @@ async def lifespan(app: FastAPI):
 
 
 # ============================================================
-# FASTAPI
+# FASTAPI APP
 # ============================================================
 
 app = FastAPI(
@@ -190,11 +189,10 @@ app = FastAPI(
 
     description=(
         "Professional Free Fire "
-        "banner generator with "
-        "Prime 0-8 support."
+        "Banner Generator"
     ),
 
-    version="3.0.0",
+    version="4.0.0",
 
     lifespan=lifespan,
 )
@@ -230,7 +228,7 @@ def get_base_dir() -> str:
 
 
 # ============================================================
-# LOCAL IMAGE LOADER
+# LOAD LOCAL IMAGE
 # ============================================================
 
 def load_local_image(
@@ -239,32 +237,33 @@ def load_local_image(
 
     base_dir = get_base_dir()
 
-    search_paths = [
+    paths = [
 
         os.path.join(
             base_dir,
-            filename,
+            filename
         ),
 
         os.path.join(
             base_dir,
             "assets",
-            filename,
+            filename
         ),
 
         os.path.join(
             os.getcwd(),
-            filename,
+            filename
         ),
 
         os.path.join(
             os.getcwd(),
             "assets",
-            filename,
+            filename
         ),
     ]
 
-    for path in search_paths:
+
+    for path in paths:
 
         if not os.path.isfile(path):
             continue
@@ -281,6 +280,7 @@ def load_local_image(
 
             continue
 
+
     return None
 
 
@@ -290,37 +290,38 @@ def load_local_image(
 
 def load_unicode_font(
     size: int,
-    font_file: str = FONT_FILE,
+    font_file: str
 ):
 
     base_dir = get_base_dir()
 
-    search_paths = [
+    paths = [
 
         os.path.join(
             base_dir,
-            font_file,
+            font_file
         ),
 
         os.path.join(
             base_dir,
             "assets",
-            font_file,
+            font_file
         ),
 
         os.path.join(
             os.getcwd(),
-            font_file,
+            font_file
         ),
 
         os.path.join(
             os.getcwd(),
             "assets",
-            font_file,
+            font_file
         ),
     ]
 
-    for path in search_paths:
+
+    for path in paths:
 
         if not os.path.isfile(path):
             continue
@@ -329,18 +330,19 @@ def load_unicode_font(
 
             return ImageFont.truetype(
                 path,
-                size,
+                size
             )
 
         except Exception:
 
             continue
 
+
     return ImageFont.load_default()
 
 
 # ============================================================
-# VALIDATE URL
+# URL CHECK
 # ============================================================
 
 def is_http_url(
@@ -349,12 +351,17 @@ def is_http_url(
 
     try:
 
-        parsed = urlparse(value)
+        parsed = urlparse(
+            value
+        )
 
-        return parsed.scheme in (
-            "http",
-            "https",
-        ) and bool(parsed.netloc)
+        return (
+            parsed.scheme in (
+                "http",
+                "https"
+            )
+            and bool(parsed.netloc)
+        )
 
     except Exception:
 
@@ -365,9 +372,12 @@ def is_http_url(
 # FETCH IMAGE
 #
 # Supports:
-#   123456
-#   banner_id
-#   https://example.com/image.png
+#
+# 123456
+#
+# OR
+#
+# https://example.com/image.png
 # ============================================================
 
 async def fetch_image_bytes(
@@ -377,7 +387,11 @@ async def fetch_image_bytes(
     if item is None:
         return None
 
-    value = str(item).strip()
+
+    value = str(
+        item
+    ).strip()
+
 
     if value.lower() in (
         "",
@@ -391,7 +405,7 @@ async def fetch_image_bytes(
 
 
     # --------------------------------------------------------
-    # Full HTTP/HTTPS URL
+    # Direct URL
     # --------------------------------------------------------
 
     if is_http_url(value):
@@ -413,28 +427,11 @@ async def fetch_image_bytes(
             image_url
         )
 
+
         if response.status_code == 200:
 
-            content_type = (
-                response.headers
-                .get(
-                    "content-type",
-                    ""
-                )
-                .lower()
-            )
+            return response.content
 
-            # Accept normal image responses.
-            # Some CDNs may omit content-type,
-            # therefore status 200 is also accepted.
-            if (
-                content_type.startswith(
-                    "image/"
-                )
-                or response.content
-            ):
-
-                return response.content
 
     except (
         httpx.HTTPError,
@@ -442,6 +439,7 @@ async def fetch_image_bytes(
     ):
 
         pass
+
 
     return None
 
@@ -460,7 +458,9 @@ def bytes_to_image(
 
             return Image.open(
                 io.BytesIO(image_bytes)
-            ).convert("RGBA")
+            ).convert(
+                "RGBA"
+            )
 
         except Exception:
 
@@ -471,19 +471,19 @@ def bytes_to_image(
         "RGBA",
         (
             100,
-            100,
+            100
         ),
         (
             0,
             0,
             0,
-            0,
-        ),
+            0
+        )
     )
 
 
 # ============================================================
-# PRIME LEVEL
+# PRIME LEVEL EXTRACTION
 # ============================================================
 
 def extract_prime_level(
@@ -491,10 +491,7 @@ def extract_prime_level(
     query_prime: Optional[int] = None,
 ) -> int:
 
-    # --------------------------------------------------------
     # Query override
-    # --------------------------------------------------------
-
     if query_prime is not None:
 
         if 0 <= query_prime <= 8:
@@ -502,13 +499,17 @@ def extract_prime_level(
             return query_prime
 
 
-    # --------------------------------------------------------
-    # API data
-    # --------------------------------------------------------
+    if not isinstance(
+        data,
+        dict
+    ):
+
+        return 0
+
 
     if isinstance(
         data.get("data"),
-        dict,
+        dict
     ):
 
         d = data["data"]
@@ -520,12 +521,13 @@ def extract_prime_level(
 
     basic_info = d.get(
         "basicInfo",
-        {},
+        {}
     )
+
 
     if not isinstance(
         basic_info,
-        dict,
+        dict
     ):
 
         basic_info = {}
@@ -545,7 +547,7 @@ def extract_prime_level(
 
     if not isinstance(
         prime_info,
-        dict,
+        dict
     ):
 
         prime_info = {}
@@ -594,7 +596,9 @@ def extract_prime_level(
 
         try:
 
-            level = int(value)
+            level = int(
+                value
+            )
 
             if 0 <= level <= 8:
 
@@ -612,22 +616,21 @@ def extract_prime_level(
 
 
 # ============================================================
-# PRIME BADGE
+# LOAD PRIME BADGE
 # ============================================================
 
 def load_prime_badge(
     prime_level: int
 ) -> Optional[Image.Image]:
 
-    if not 0 <= prime_level <= 8:
-
-        prime_level = 0
-
-
     filename = PRIME_FILES.get(
-        prime_level,
-        "prime0.png",
+        prime_level
     )
+
+
+    if filename is None:
+
+        filename = "prime0.png"
 
 
     return load_local_image(
@@ -636,96 +639,151 @@ def load_prime_badge(
 
 
 # ============================================================
-# PRIME 8 FULL FRAME
+# PRIME 8 FRAME
+#
+# IMPORTANT:
+#
+# The frame is NOT stretched to the entire canvas.
+#
+# It is placed as an inset border around the complete
+# avatar + banner, matching the reference style.
 # ============================================================
 
 def apply_prime8_frame(
-    final: Image.Image,
+    final: Image.Image
 ) -> None:
-    """
-    Applies prime8frame.png over the complete
-    banner.
 
-    The file should preferably be a transparent
-    PNG containing the yellow/gold frame/border.
-
-    The center should remain transparent so the
-    player avatar and banner remain visible.
-    """
-
-    frame_img = load_local_image(
+    frame = load_local_image(
         "prime8frame.png"
     )
 
 
-    if frame_img is None:
-
+    if frame is None:
         return
 
 
-    frame_img = frame_img.resize(
-        final.size,
-        Image.LANCZOS,
+    # --------------------------------------------------------
+    # Reference-style inset.
+    #
+    # The reference has a small transparent gap between
+    # the outer image edge and the gold frame.
+    # --------------------------------------------------------
+
+    FRAME_LEFT = 28
+    FRAME_TOP = 14
+    FRAME_RIGHT = 28
+    FRAME_BOTTOM = 14
+
+
+    target_width = max(
+        1,
+        final.width
+        - FRAME_LEFT
+        - FRAME_RIGHT
     )
 
 
-    if frame_img.mode != "RGBA":
+    target_height = max(
+        1,
+        final.height
+        - FRAME_TOP
+        - FRAME_BOTTOM
+    )
 
-        frame_img = frame_img.convert(
+
+    # --------------------------------------------------------
+    # Resize frame to exact inner banner area.
+    # --------------------------------------------------------
+
+    frame = frame.resize(
+
+        (
+            target_width,
+            target_height
+        ),
+
+        Image.LANCZOS
+    )
+
+
+    if frame.mode != "RGBA":
+
+        frame = frame.convert(
             "RGBA"
         )
 
 
+    # --------------------------------------------------------
+    # Composite frame over COMPLETE banner.
+    # --------------------------------------------------------
+
     final.alpha_composite(
-        frame_img,
+
+        frame,
+
         (
-            0,
-            0,
-        ),
+            FRAME_LEFT,
+            FRAME_TOP
+        )
     )
 
 
 # ============================================================
-# UNICODE TEXT
+# CHEROKEE CHECK
+# ============================================================
+
+def is_cherokee(
+    character: str
+) -> bool:
+
+    code = ord(
+        character
+    )
+
+    return (
+
+        0x13A0
+        <= code
+        <= 0x13FF
+
+        or
+
+        0xAB70
+        <= code
+        <= 0xABBF
+    )
+
+
+# ============================================================
+# UNICODE TEXT DRAW
 # ============================================================
 
 def draw_unicode_text(
+
     draw: ImageDraw.ImageDraw,
+
     text: str,
+
     position,
+
     normal_font,
+
     cherokee_font,
+
     fill="white",
+
     stroke_width=2,
+
     stroke_fill="black",
+
 ):
 
     x, y = position
 
 
-    def is_cherokee(
-        character: str
-    ) -> bool:
-
-        code = ord(
-            character
-        )
-
-        return (
-
-            0x13A0
-            <= code
-            <= 0x13FF
-
-            or
-
-            0xAB70
-            <= code
-            <= 0xABBF
-        )
-
-
-    for character in text:
+    for character in str(
+        text
+    ):
 
         font = (
 
@@ -743,7 +801,7 @@ def draw_unicode_text(
 
             (
                 x,
-                y,
+                y
             ),
 
             character,
@@ -759,30 +817,42 @@ def draw_unicode_text(
 
 
         x += draw.textlength(
+
             character,
-            font=font,
+
+            font=font
         )
 
 
 # ============================================================
-# BANNER GENERATOR
+# PROCESS BANNER
 # ============================================================
 
 def process_banner_image(
+
     data: Dict[str, Any],
+
     avatar_bytes: Optional[bytes],
+
     banner_bytes: Optional[bytes],
+
     prime_level: int = 0,
+
 ) -> io.BytesIO:
 
 
     # ========================================================
-    # LOAD IMAGES
+    # LOAD AVATAR
     # ========================================================
 
     avatar_img = bytes_to_image(
         avatar_bytes
     )
+
+
+    # ========================================================
+    # LOAD BANNER
+    # ========================================================
 
     banner_img = bytes_to_image(
         banner_bytes
@@ -790,30 +860,33 @@ def process_banner_image(
 
 
     # ========================================================
-    # PLAYER DATA
+    # DATA
     # ========================================================
-
-    level = str(
-        data.get(
-            "level",
-            0,
-        )
-    )
 
     name = str(
         data.get(
             "name",
-            "Unknown",
+            "Unknown"
         )
         or "Unknown"
     )
 
+
     guild = str(
         data.get(
             "guild",
-            "",
+            ""
         )
         or ""
+    )
+
+
+    level = str(
+        data.get(
+            "level",
+            0
+        )
+        or 0
     )
 
 
@@ -828,7 +901,7 @@ def process_banner_image(
         int(
             TARGET_HEIGHT
             * AVATAR_ZOOM
-        ),
+        )
     )
 
 
@@ -836,16 +909,17 @@ def process_banner_image(
 
         (
             zoom_size,
-            zoom_size,
+            zoom_size
         ),
 
-        Image.LANCZOS,
+        Image.LANCZOS
     )
 
 
     center = (
         zoom_size // 2
     )
+
 
     half = (
         TARGET_HEIGHT // 2
@@ -858,17 +932,20 @@ def process_banner_image(
         - AVATAR_SHIFT_X
     )
 
+
     top = (
         center
         - half
         - AVATAR_SHIFT_Y
     )
 
+
     right = (
         center
         + half
         - AVATAR_SHIFT_X
     )
+
 
     bottom = (
         center
@@ -883,7 +960,7 @@ def process_banner_image(
             left,
             top,
             right,
-            bottom,
+            bottom
         )
     )
 
@@ -907,15 +984,15 @@ def process_banner_image(
 
             (
                 TARGET_HEIGHT * 2,
-                TARGET_HEIGHT,
+                TARGET_HEIGHT
             ),
 
             (
-                30,
-                30,
-                30,
-                255,
-            ),
+                35,
+                35,
+                35,
+                255
+            )
         )
 
 
@@ -944,16 +1021,19 @@ def process_banner_image(
     )
 
 
+    # Slight rotation like the original
     banner_img = banner_img.rotate(
         3,
-        expand=True,
+        expand=True
     )
 
 
     bw, bh = banner_img.size
 
+
     if bw <= 0:
         bw = 1
+
 
     if bh <= 0:
         bh = 1
@@ -963,13 +1043,16 @@ def process_banner_image(
         bw * BANNER_START_X
     )
 
+
     crop_top = int(
         bh * BANNER_START_Y
     )
 
+
     crop_right = int(
         bw * BANNER_END_X
     )
+
 
     crop_bottom = int(
         bh * BANNER_END_Y
@@ -978,12 +1061,13 @@ def process_banner_image(
 
     crop_right = max(
         crop_left + 1,
-        crop_right,
+        crop_right
     )
+
 
     crop_bottom = max(
         crop_top + 1,
-        crop_bottom,
+        crop_bottom
     )
 
 
@@ -993,12 +1077,13 @@ def process_banner_image(
             crop_left,
             crop_top,
             crop_right,
-            crop_bottom,
+            crop_bottom
         )
     )
 
 
     bw, bh = banner_img.size
+
 
     if bh <= 0:
         bh = 1
@@ -1012,7 +1097,7 @@ def process_banner_image(
             TARGET_HEIGHT
             * (bw / bh)
             * 2
-        ),
+        )
     )
 
 
@@ -1020,10 +1105,10 @@ def process_banner_image(
 
         (
             banner_width,
-            TARGET_HEIGHT,
+            TARGET_HEIGHT
         ),
 
-        Image.LANCZOS,
+        Image.LANCZOS
     )
 
 
@@ -1035,7 +1120,7 @@ def process_banner_image(
 
 
     # ========================================================
-    # BASE COMPOSITE
+    # COMPLETE CANVAS
     # ========================================================
 
     final_width = (
@@ -1051,44 +1136,46 @@ def process_banner_image(
 
         (
             final_width,
-            TARGET_HEIGHT,
+            TARGET_HEIGHT
         ),
 
         (
             0,
             0,
             0,
-            255,
-        ),
+            255
+        )
     )
 
 
+    # Avatar
     final.alpha_composite(
+
         avatar_img,
+
         (
             0,
-            0,
-        ),
+            0
+        )
     )
 
 
+    # Banner
     final.alpha_composite(
+
         banner_img,
+
         (
             avatar_img.width,
-            0,
-        ),
+            0
+        )
     )
 
 
     # ========================================================
-    # PRIME 8 FRAME
-    # ========================================================
+    # PRIME 8 GOLD FRAME
     #
-    # This is the GOLD/YELLOW FULL BANNER FRAME.
-    #
-    # It is applied before text so that text remains
-    # clearly visible above the frame.
+    # MUST be before badge/text.
     # ========================================================
 
     if prime_level == 8:
@@ -1115,10 +1202,10 @@ def process_banner_image(
 
                 (
                     PRIME_BADGE_SIZE,
-                    PRIME_BADGE_SIZE,
+                    PRIME_BADGE_SIZE
                 ),
 
-                Image.LANCZOS,
+                Image.LANCZOS
             )
 
 
@@ -1139,13 +1226,13 @@ def process_banner_image(
 
                 (
                     badge_x,
-                    badge_y,
-                ),
+                    badge_y
+                )
             )
 
 
     # ========================================================
-    # TEXT
+    # TEXT DRAWER
     # ========================================================
 
     draw = ImageDraw.Draw(
@@ -1153,56 +1240,64 @@ def process_banner_image(
     )
 
 
+    # ========================================================
+    # FONTS
+    # ========================================================
+
     font_big = load_unicode_font(
         125,
-        FONT_FILE,
+        FONT_FILE
     )
+
 
     font_big_c = load_unicode_font(
         125,
-        FONT_CHEROKEE,
+        FONT_CHEROKEE
     )
+
 
     font_small = load_unicode_font(
         95,
-        FONT_FILE,
+        FONT_FILE
     )
+
 
     font_small_c = load_unicode_font(
         95,
-        FONT_CHEROKEE,
+        FONT_CHEROKEE
     )
+
 
     font_level = load_unicode_font(
         50,
-        FONT_FILE,
+        FONT_FILE
     )
 
 
     # ========================================================
-    # NAME
+    # PLAYER NAME
     # ========================================================
 
     draw_unicode_text(
 
-        draw=draw,
+        draw,
 
-        text=name,
+        name,
 
-        position=(
+        (
             avatar_img.width + 65,
-            40,
+            40
         ),
 
-        normal_font=font_big,
+        font_big,
 
-        cherokee_font=font_big_c,
+        font_big_c,
 
         fill="white",
 
         stroke_width=STROKE_NAME,
 
-        stroke_fill="black",
+        stroke_fill="black"
     )
 
 
@@ -1212,24 +1307,24 @@ def process_banner_image(
 
     draw_unicode_text(
 
-        draw=draw,
+        draw,
 
-        text=guild,
+        guild,
 
-        position=(
+        (
             avatar_img.width + 65,
-            220,
+            220
         ),
 
-        normal_font=font_small,
+        font_small,
 
-        cherokee_font=font_small_c,
+        font_small_c,
 
         fill="white",
 
         stroke_width=STROKE_GUILD,
 
-        stroke_fill="black",
+        stroke_fill="black"
     )
 
 
@@ -1246,25 +1341,24 @@ def process_banner_image(
 
         (
             0,
-            0,
+            0
         ),
 
         level_text,
 
         font=font_level,
 
-        stroke_width=STROKE_LEVEL,
+        stroke_width=STROKE_LEVEL
     )
 
 
     text_width = (
-        bbox[2]
-        - bbox[0]
+        bbox[2] - bbox[0]
     )
 
+
     text_height = (
-        bbox[3]
-        - bbox[1]
+        bbox[3] - bbox[1]
     )
 
 
@@ -1288,7 +1382,7 @@ def process_banner_image(
 
         (
             level_x,
-            level_y,
+            level_y
         ),
 
         level_text,
@@ -1299,12 +1393,12 @@ def process_banner_image(
 
         stroke_width=STROKE_LEVEL,
 
-        stroke_fill="black",
+        stroke_fill="black"
     )
 
 
     # ========================================================
-    # OUTPUT
+    # OUTPUT PNG
     # ========================================================
 
     output = io.BytesIO()
@@ -1316,17 +1410,18 @@ def process_banner_image(
 
         format="PNG",
 
-        optimize=True,
+        optimize=True
     )
 
 
     output.seek(0)
 
+
     return output
 
 
 # ============================================================
-# ROOT ENDPOINT
+# ROOT
 # ============================================================
 
 @app.get("/")
@@ -1340,7 +1435,7 @@ async def root():
             "Sulav Free Fire Banner API"
         ),
 
-        "version": "3.0.0",
+        "version": "4.0.0",
 
         "prime_levels": "0-8",
 
@@ -1350,26 +1445,24 @@ async def root():
 
         "endpoint": (
             "/sulav"
-            "?uid={}"
-            "&name={}"
-            "&guild={}"
-            "&banner={}"
-            "&avatar={}"
-            "&prime={}"
+            "?uid={uid}"
+            "&name={name}"
+            "&guild={guild}"
+            "&banner={banner}"
+            "&avatar={avatar}"
+            "&prime={prime}"
         ),
 
         "example": (
-            "/sulav"
-            "?uid=11111111"
-        ),
-
+            "/sulav?uid=11111111"
+        )
     }
 
 
 # ============================================================
-# MAIN ENDPOINT
+# MAIN /SULAV ENDPOINT
 #
-# ALL PARAMETERS OPTIONAL
+# EVERY PARAMETER IS OPTIONAL
 # ============================================================
 
 @app.get("/sulav")
@@ -1377,45 +1470,47 @@ async def get_sulav_banner(
 
     uid: Optional[str] = Query(
         None,
-        description="Free Fire UID",
+        description="Free Fire UID"
     ),
 
     name: Optional[str] = Query(
         None,
-        description="Custom player name",
+        description="Custom player name"
     ),
 
     guild: Optional[str] = Query(
         None,
-        description="Custom guild name",
+        description="Custom guild name"
     ),
 
     banner: Optional[str] = Query(
         None,
         description=(
-            "Custom banner ID or image URL"
-        ),
+            "Banner image ID or URL"
+        )
     ),
 
     avatar: Optional[str] = Query(
         None,
         description=(
-            "Custom avatar ID or image URL"
-        ),
+            "Avatar image ID or URL"
+        )
     ),
 
     prime: Optional[int] = Query(
         None,
         ge=0,
         le=8,
-        description="Prime Level 0-8",
+        description=(
+            "Prime level 0-8"
+        )
     ),
 
 ) -> Response:
 
 
     # ========================================================
-    # INITIAL DATA
+    # DEFAULT API DATA
     # ========================================================
 
     api_data: Dict[str, Any] = {}
@@ -1426,7 +1521,7 @@ async def get_sulav_banner(
 
 
     # ========================================================
-    # FETCH UID DATA ONLY WHEN UID EXISTS
+    # GET PLAYER INFO WHEN UID IS PROVIDED
     # ========================================================
 
     if uid:
@@ -1444,13 +1539,13 @@ async def get_sulav_banner(
 
                     params={
                         "uid": uid
-                    },
+                    }
                 )
 
 
             except (
                 httpx.HTTPError,
-                asyncio.TimeoutError,
+                asyncio.TimeoutError
             ) as error:
 
                 raise HTTPException(
@@ -1458,9 +1553,10 @@ async def get_sulav_banner(
                     status_code=502,
 
                     detail=(
-                        "Sulav API connection "
-                        f"error: {str(error)}"
-                    ),
+                        "Sulav Info API "
+                        "connection error: "
+                        f"{str(error)}"
+                    )
                 )
 
 
@@ -1471,9 +1567,9 @@ async def get_sulav_banner(
                     status_code=502,
 
                     detail=(
-                        "Sulav API returned HTTP "
-                        f"{response.status_code}"
-                    ),
+                        "Sulav Info API returned "
+                        f"HTTP {response.status_code}"
+                    )
                 )
 
 
@@ -1488,15 +1584,15 @@ async def get_sulav_banner(
                     status_code=502,
 
                     detail=(
-                        "Sulav API returned "
+                        "Sulav Info API returned "
                         "invalid JSON"
-                    ),
+                    )
                 )
 
 
             if not isinstance(
                 api_data,
-                dict,
+                dict
             ):
 
                 raise HTTPException(
@@ -1504,14 +1600,14 @@ async def get_sulav_banner(
                     status_code=502,
 
                     detail=(
-                        "Invalid Sulav API response"
-                    ),
+                        "Invalid Sulav Info API response"
+                    )
                 )
 
 
             if isinstance(
                 api_data.get("data"),
-                dict,
+                dict
             ):
 
                 data = api_data["data"]
@@ -1523,18 +1619,19 @@ async def get_sulav_banner(
 
             basic_info = data.get(
                 "basicInfo",
-                {},
+                {}
             )
+
 
             clan_info = data.get(
                 "clanBasicInfo",
-                {},
+                {}
             )
 
 
             if not isinstance(
                 basic_info,
-                dict,
+                dict
             ):
 
                 basic_info = {}
@@ -1542,16 +1639,16 @@ async def get_sulav_banner(
 
             if not isinstance(
                 clan_info,
-                dict,
+                dict
             ):
 
                 clan_info = {}
 
 
     # ========================================================
-    # PLAYER DATA
+    # NAME
     #
-    # Query values have priority over API values.
+    # Custom name > API name > Unknown
     # ========================================================
 
     final_name = (
@@ -1562,10 +1659,16 @@ async def get_sulav_banner(
 
         else basic_info.get(
             "nickname",
-            "Unknown",
+            "Unknown"
         )
     )
 
+
+    # ========================================================
+    # GUILD
+    #
+    # Custom guild > API guild > empty
+    # ========================================================
 
     final_guild = (
 
@@ -1575,31 +1678,41 @@ async def get_sulav_banner(
 
         else clan_info.get(
             "clanName",
-            "",
+            ""
         )
     )
 
 
+    # ========================================================
+    # LEVEL
+    # ========================================================
+
     final_level = basic_info.get(
         "level",
-        0,
+        0
     )
 
 
     # ========================================================
-    # IMAGE IDS
+    # API IMAGE IDs
     # ========================================================
 
     api_avatar = basic_info.get(
         "headPic"
     )
 
+
     api_banner = basic_info.get(
         "bannerId"
     )
 
 
-    # Query override > API
+    # ========================================================
+    # IMAGE OVERRIDE
+    #
+    # Custom avatar/banner has priority.
+    # ========================================================
+
     final_avatar = (
 
         avatar
@@ -1622,13 +1735,16 @@ async def get_sulav_banner(
 
     # ========================================================
     # PRIME
+    #
+    # Custom prime has priority.
+    # Otherwise detect from API.
     # ========================================================
 
     prime_level = extract_prime_level(
 
         api_data,
 
-        query_prime=prime,
+        query_prime=prime
     )
 
 
@@ -1636,23 +1752,22 @@ async def get_sulav_banner(
     # FETCH AVATAR + BANNER
     # ========================================================
 
-    (
-        avatar_bytes,
-        banner_bytes,
-    ) = await asyncio.gather(
+    avatar_bytes, banner_bytes = (
+        await asyncio.gather(
 
-        fetch_image_bytes(
-            final_avatar
-        ),
+            fetch_image_bytes(
+                final_avatar
+            ),
 
-        fetch_image_bytes(
-            final_banner
-        ),
+            fetch_image_bytes(
+                final_banner
+            )
+        )
     )
 
 
     # ========================================================
-    # GENERATE IMAGE
+    # GENERATE IMAGE IN THREAD
     # ========================================================
 
     loop = asyncio.get_running_loop()
@@ -1676,7 +1791,7 @@ async def get_sulav_banner(
 
             banner_bytes,
 
-            prime_level,
+            prime_level
         )
 
 
@@ -1689,7 +1804,7 @@ async def get_sulav_banner(
             detail=(
                 "Banner generation failed: "
                 f"{str(error)}"
-            ),
+            )
         )
 
 
@@ -1713,18 +1828,19 @@ async def get_sulav_banner(
                 prime_level
             ),
 
-            "X-Sulav-API": "Banner",
-        },
+            "X-Sulav-API": "Banner"
+        }
     )
 
 
 # ============================================================
-# RUN SERVER
+# SERVER
 # ============================================================
 
 if __name__ == "__main__":
 
     import uvicorn
+
 
     uvicorn.run(
 
@@ -1732,5 +1848,5 @@ if __name__ == "__main__":
 
         host="0.0.0.0",
 
-        port=5000,
+        port=5000
     )
